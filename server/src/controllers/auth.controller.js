@@ -1,16 +1,17 @@
-import { Role } from "@prisma/client";
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import prisma from "../../prisma/prisma.js";
+import { Role } from '@prisma/client';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import prisma from '../../prisma/prisma.js';
 
 export const loginUser = async (req, res) => {
   const { username, password } = req.body;
-  console.log("Hereee");
+  console.log('Hereee');
   try {
     if (!username || !password)
       return res
         .status(403)
-        .json({ success: false, message: "Required Fields are missing!" });
+        .json({ success: false, message: 'Required Fields are missing!' });
+
     const user = await prisma.sasStaff.findUnique({
       where: {
         username: username,
@@ -20,37 +21,44 @@ export const loginUser = async (req, res) => {
         hashedPassword: true,
         role: true,
         isActive: true,
-        // serviceWindowId: true
+        deletedAt: true,
       },
     });
 
     if (!user)
       return res
         .status(404)
-        .json({ success: false, message: "Account not found!" });
+        .json({ success: false, message: 'Account not found!' });
+
+    // ✅ Check if account is inactive or deleted
+    if (!user.isActive || user.deletedAt) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials',
+      });
+    }
 
     const decrypt = await bcrypt.compare(password, user.hashedPassword);
     if (!decrypt)
       return res
         .status(403)
-        .json({ success: false, message: "Invalid Credentials" });
+        .json({ success: false, message: 'Invalid Credentials' });
 
     const token = await jwt.sign(
       {
         id: user.sasStaffId,
         role: user.role,
         isActive: user.isActive,
-        // serviceWindowId: user.serviceWindowId
       },
       process.env.JWT_SECRET,
-      { expiresIn: user.role === Role.PERSONNEL ? "10h" : "5h" }
+      { expiresIn: user.role === Role.PERSONNEL ? '10h' : '5h' }
     );
 
-    res.cookie("access_token", token, {
+    res.cookie('access_token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production", // HTTPS only in prod
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-      path: "/",
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      path: '/',
       maxAge:
         user.role === Role.PERSONNEL
           ? 1000 * 60 * 60 * 20
@@ -59,16 +67,15 @@ export const loginUser = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Logged In Successfully!",
+      message: 'Logged In Successfully!',
       role: user.role,
-      // serviceWindowId: user.serviceWindowId,
       token: token,
     });
   } catch (error) {
-    console.error("Error in Login: ", error);
+    console.error('Error in Login: ', error);
     return res
       .status(500)
-      .json({ sucess: false, message: "Internal Server Error!" });
+      .json({ success: false, message: 'Internal Server Error!' });
   }
 };
 
@@ -92,7 +99,7 @@ export const createUser = (req, res) => {
     ) {
       return res
         .status(403)
-        .json({ success: false, message: "Required fields are missing!" });
+        .json({ success: false, message: 'Required fields are missing!' });
     }
     if (!first_name?.trim() || !last_name?.trim())
       return res.status(403).json({});
@@ -101,15 +108,15 @@ export const createUser = (req, res) => {
 };
 
 export const logoutUser = (req, res) => {
-  res.clearCookie("access_token", {
+  res.clearCookie('access_token', {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
   });
 
   return res.status(200).json({
     success: true,
-    message: "Logged Out Successfully!",
+    message: 'Logged Out Successfully!',
   });
 };
 
@@ -117,9 +124,9 @@ export const verifyUser = (req, res) => {
   try {
     res.status(200).json({ success: true, user: req.user });
   } catch (error) {
-    console.error("Error in verifying user: ", error);
+    console.error('Error in verifying user: ', error);
     return res
       .status(500)
-      .json({ success: false, message: "Internal Server Error!" });
+      .json({ success: false, message: 'Internal Server Error!' });
   }
 };
